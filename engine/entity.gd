@@ -75,8 +75,10 @@ func create_hitbox() -> void:
 	hitbox = new_hitbox
 
 func loop_network() -> void:
-	set_network_master(network.map_owners[network.current_map.name])
-	if !network.map_owners[network.current_map.name] == get_tree().get_network_unique_id():
+	if network.map_owners.has(network.current_map.name):
+		set_network_master(network.map_owners[network.current_map.name])
+
+	if !network.is_network_master():
 		puppet_update()
 	if position == Vector2(0,0):
 		hide()

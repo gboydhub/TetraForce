@@ -32,7 +32,7 @@ func initialize() -> void:
 	clock.one_shot = false
 	clock.owner = self
 	add_child(clock)
-	clock.start()
+	#clock.start()
 	clock.connect("timeout", self, "clock_update")
 	
 	if get_tree().is_network_server():
@@ -85,6 +85,18 @@ func clock_update() -> void:
 	update_maps()
 	update_current_players()
 
+remote func remove_player_from_map(player_id):
+	active_maps.erase(player_id)
+	update_current_players()
+	_update_map_owners()
+	current_map.update_players()
+	
+remotesync func player_exiting_scene() -> void:
+	var peer_id = network.get_rpc_sender_id()
+	if map_peers.has(peer_id):
+		map_peers.remove(peer_id)
+		current_map.update_players()
+	
 func update_maps() -> void:
 	if get_tree().is_network_server():
 		active_maps[1] = current_map.name
@@ -108,12 +120,14 @@ func update_current_players() -> void:
 	current_players = new_current_players
 
 func _update_map_owners() -> void:
+	
 	for map in active_maps.values():
 		if !map_owners.keys().has(map):
 			map_owners[map] = active_maps.keys()[active_maps.values().find(map)]
 	
 	# remove old maps
-	for map in map_owners.keys():
+	var owner_keys = map_owners.keys()
+	for map in owner_keys:
 		if !active_maps.values().has(map):
 			map_owners.erase(map)
 	
