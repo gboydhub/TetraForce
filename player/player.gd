@@ -15,6 +15,7 @@ onready var holdTimer: Timer = $HoldTimer
 var chat_messages: Array = [{"source": "Welcome to TetraForce!", "message": ""}]
 
 func _ready() -> void:
+	print_debug("Playerrdy ", get_path())
 	if is_network_master():
 		global.player = self
 		global.set_player_state()

@@ -9,8 +9,12 @@ func _ready() -> void:
 	add_child(camera)
 	add_child(preload("res://ui/hud.tscn").instance())
 	add_new_player(get_tree().get_network_unique_id())
+
+	if get_tree().is_network_server():
+		network.add_player_to_map(get_tree().get_network_unique_id(), self.name)
+	else:
+		network.rpc_id(1, "add_player_to_map", get_tree().get_network_unique_id(), self.name)
 	
-	network.update_maps()
 	screenfx.play("fadein")
 	
 	if get_tree().is_network_server():
@@ -84,6 +88,11 @@ func update_players() -> void:
 	for id in map_peers:
 		if !player_names.has(id):
 			add_new_player(id)
+			
+	print("Nodes: ", get_tree().get_nodes_in_group("player"))
+	print("active_maps: ", network.active_maps)
+	print("map_peers: ", network.map_peers)
+	print("map_owners: ", network.map_owners)
 
 remote func spawn_subitem(dropped: String, pos: Vector2, subitem_name: String) -> void:
 	var drop_instance = load(dropped).instance()

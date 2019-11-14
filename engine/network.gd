@@ -85,9 +85,18 @@ func clock_update() -> void:
 	update_maps()
 	update_current_players()
 
+remote func add_player_to_map(player_id, map):
+	active_maps[player_id] = map
+	map_peers.append(player_id)
+	update_current_players()
+	rpc("_receive_active_maps", active_maps)
+	_update_map_owners()
+	current_map.update_players()
+	
 remote func remove_player_from_map(player_id):
 	active_maps.erase(player_id)
 	update_current_players()
+	rpc("_receive_active_maps", active_maps)
 	_update_map_owners()
 	current_map.update_players()
 	
@@ -95,7 +104,11 @@ remotesync func player_exiting_scene() -> void:
 	var peer_id = network.get_rpc_sender_id()
 	if map_peers.has(peer_id):
 		map_peers.remove(peer_id)
-		current_map.update_players()
+	if active_maps.has(peer_id):
+		active_maps.erase(peer_id)
+	
+	get_tree().root.find_node(peer_id).call_deferred("queue_free")
+	current_map.update_players()
 	
 func update_maps() -> void:
 	if get_tree().is_network_server():
@@ -149,7 +162,7 @@ remote func _receive_current_map(id: int, map) -> void:
 	rpc_id(id, "_receive_active_maps", active_maps)
 
 # received by clients
-remote func _receive_active_maps(maps) -> void:
+remote func _receive_active_maps(maps: Dictionary) -> void:
 	active_maps = maps
 
 remote func _receive_map_owners(owners: Dictionary) -> void:

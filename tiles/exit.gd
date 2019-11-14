@@ -16,6 +16,8 @@ func body_entered(body) -> void:
 		global.get_player_state()
 		global.next_entrance = entrance
 		
+		print_debug("Used exit")
+		
 		var old_map = get_parent()
 		var root = old_map.get_parent()
 		
@@ -29,6 +31,7 @@ func body_entered(body) -> void:
 		
 		var new_map_path = "res://maps/" + map + ".tmx"
 		var new_map = load(new_map_path).instance()
-		root.call_deferred("add_child", new_map)
 		
+		root.remove_child(old_map)
 		old_map.call_deferred("queue_free")
+		root.call_deferred("add_child", new_map)
