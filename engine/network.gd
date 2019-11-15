@@ -25,20 +25,21 @@ func _ready() -> void:
 	set_process(false)
 	get_tree().connect("network_peer_connected", self, "_player_connected")
 	get_tree().connect("network_peer_disconnected", self, "_player_disconnected")
+	
 
 func initialize() -> void:
-	clock = Timer.new()
-	clock.wait_time = 0.1
-	clock.one_shot = false
-	clock.owner = self
-	add_child(clock)
+	#clock = Timer.new()
+	#clock.wait_time = 0.1
+	#clock.one_shot = false
+	#clock.owner = self
+	#add_child(clock)
 	#clock.start()
-	clock.connect("timeout", self, "clock_update")
+	#clock.connect("timeout", self, "clock_update")
 	
 	if get_tree().is_network_server():
 		player_data[1] = my_player_data
-	
-	rpc_id(1, "_receive_my_player_data", get_tree().get_network_unique_id(), my_player_data)
+	else:
+		rpc_id(1, "_receive_my_player_data", get_tree().get_network_unique_id(), my_player_data)
 
 remote func _receive_my_player_data(id, new_player_data) -> void:
 	
@@ -80,6 +81,13 @@ func check_dupe_name(player_name: String) -> bool:
 
 remote func _receive_player_data(received_player_data: Dictionary) -> void:
 	player_data = received_player_data
+	
+	for pid in player_data.keys():
+		var update_p = get_node_or_null("/root/level/players/" + str(pid))
+		if update_p:
+			update_p.get_node("Sprite").texture = load(network.player_data.get(pid).skin)
+			update_p.texture_default = load(network.player_data.get(pid).skin)
+			update_p.set_player_label(network.player_data.get(pid).name)
 
 func clock_update() -> void:
 	update_maps()
@@ -89,25 +97,30 @@ remote func add_player_to_map(player_id, map):
 	active_maps[player_id] = map
 	map_peers.append(player_id)
 	update_current_players()
-	rpc("_receive_active_maps", active_maps)
 	_update_map_owners()
 	current_map.update_players()
+	rpc("_receive_active_maps", active_maps)
+	#var mapnode = get_tree().root.find_node(map)
+	#if !mapnode:
+	#	mapnode = Node.new()
+	#	get_tree().root.add_child(mapnode)
+		
 	
 remote func remove_player_from_map(player_id):
-	active_maps.erase(player_id)
+	print_debug("PID", player_id)
+	if active_maps.has(player_id):
+		active_maps.erase(player_id)
 	update_current_players()
-	rpc("_receive_active_maps", active_maps)
 	_update_map_owners()
 	current_map.update_players()
+	rpc("_receive_active_maps", active_maps)
 	
-remotesync func player_exiting_scene() -> void:
-	var peer_id = network.get_rpc_sender_id()
+remote func player_exiting_scene(peer_id) -> void:
 	if map_peers.has(peer_id):
-		map_peers.remove(peer_id)
+		map_peers.remove(map_peers.find(peer_id))
 	if active_maps.has(peer_id):
 		active_maps.erase(peer_id)
 	
-	get_tree().root.find_node(peer_id).call_deferred("queue_free")
 	current_map.update_players()
 	
 func update_maps() -> void:
@@ -128,7 +141,8 @@ func update_current_players() -> void:
 		if active_maps.get(peer) == current_map.name:
 			new_current_players.append(peer)
 	var other_players: Array = new_current_players
-	other_players.erase(get_tree().get_network_unique_id())
+	if other_players.has(get_tree().get_network_unique_id()):
+		other_players.erase(get_tree().get_network_unique_id())
 	map_peers = other_players
 	current_players = new_current_players
 
@@ -146,8 +160,9 @@ func _update_map_owners() -> void:
 	
 	# reassign owners
 	for map in map_owners.keys():
-		var map_owner = map_owners.get(map) # gets player id of map
-		if active_maps[map_owner] != map: # if player id is not in that map...
+		var map_owner = map_owners.get(map, -1) # gets player id of map
+		var active_check = active_maps.get(map_owner, "-1")
+		if active_check != map: # if player id is not in that map...
 			map_owners[map] = active_maps.keys()[active_maps.values().find(map)] # change owner to a player in that map
 	
 	rpc("_receive_map_owners", map_owners)
@@ -164,9 +179,12 @@ remote func _receive_current_map(id: int, map) -> void:
 # received by clients
 remote func _receive_active_maps(maps: Dictionary) -> void:
 	active_maps = maps
+	update_current_players()
+	current_map.update_players()
 
 remote func _receive_map_owners(owners: Dictionary) -> void:
 	map_owners = owners
+	current_map.update_players()
 
 func _player_connected(id) -> void:
 	update_current_players()
@@ -225,7 +243,6 @@ func get_room(pos):
 	var screen: Vector2 = get_room_screen(pos)
 	if rooms.has(screen) :
 		return rooms[screen]
-	
 	else :
 		# create room
 		var r = Room.new()

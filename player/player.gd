@@ -15,15 +15,28 @@ onready var holdTimer: Timer = $HoldTimer
 var chat_messages: Array = [{"source": "Welcome to TetraForce!", "message": ""}]
 
 func _ready() -> void:
-	print_debug("Playerrdy ", get_path())
+	
 	if is_network_master():
 		global.player = self
-		global.set_player_state()
-		var hud = get_parent().get_node("HUD")
-		hud.initialize()
-		
-		position = get_parent().get_node(global.next_entrance).position
-		var offset = get_parent().get_node(global.next_entrance).player_position
+		#enter_map()
+	
+	puppet_pos = position
+	puppet_spritedir = "Down"
+	puppet_anim = "idleDown"
+	
+	add_to_group("player")
+	ray.add_exception(hitbox)
+	
+	$PlayerName.visible = settings.get_pref("show_name_tags")
+
+func initialize() -> void:
+	if is_network_master():
+		camera.initialize(self)
+
+func enter_map():
+	if is_network_master():
+		position = network.current_map.get_node(global.next_entrance).position
+		var offset = network.current_map.get_node(global.next_entrance).player_position
 		match offset:
 			"up":
 				position.y -= 16
@@ -37,22 +50,24 @@ func _ready() -> void:
 			"right":
 				position.x += 16
 				spritedir = "Right"
-	
+				
+		camera = network.current_map.get_node("Camera")
+		connect_camera()
+		initialize()
+		
+		var hud = network.current_map.get_node("HUD")
+		hud.initialize()
+		
 	puppet_pos = position
 	puppet_spritedir = "Down"
 	puppet_anim = "idleDown"
 	
-	add_to_group("player")
-	ray.add_exception(hitbox)
-	
-	connect_camera()
-	
-	$PlayerName.visible = settings.get_pref("show_name_tags")
-
-func initialize() -> void:
-	if is_network_master():
-		camera.initialize(self)
-		
+	set_physics_process(true)
+	room = network.get_room(position)
+	room.add_entity(self)
+	state = "default"
+	show()
+			
 func set_player_label(player_name: String):
 	$PlayerName.text = player_name
 
@@ -201,6 +216,7 @@ func loop_action_button() -> void:
 		if Input.is_action_just_pressed(controller.SELECT):
 			show_inventory()
 			state = "menu"
+
 		elif Input.is_action_just_pressed("TOGGLE_CHAT") || Input.is_action_just_pressed(controller.START):
 			show_chat()
 			state = "menu"
@@ -253,6 +269,6 @@ func _on_HoldTimer_timeout() -> void:
 	sfx.play(preload("res://items/tink.wav")) # get better sfx
 
 func player_entered(id) -> void:
-	if is_network_master():
+	if is_network_master() && id != get_tree().get_network_unique_id():
 		rset_id(id, "puppet_spritedir", spritedir)
 		rpc_id(id, "update_light_energy", $Light2D.energy)

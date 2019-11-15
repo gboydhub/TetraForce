@@ -34,7 +34,7 @@ onready var anim: AnimationPlayer = $AnimationPlayer
 onready var sprite: Sprite = $Sprite
 var hitbox: Area2D # to be defined by create_hitbox()
 
-onready var camera = get_parent().get_node("Camera")
+var camera
 
 var texture_default = null
 var entity_shader = preload("res://engine/entity.shader")
@@ -55,7 +55,8 @@ func _ready() -> void:
 	home_position = position
 	create_hitbox()
 	
-	get_parent().connect("player_entered", self, "player_entered")
+	if network.current_map:
+		network.current_map.connect("player_entered", self, "player_entered")
 	
 	room = network.get_room(position)
 	room.add_entity(self)

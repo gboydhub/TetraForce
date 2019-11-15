@@ -11,9 +11,21 @@ onready var host = settings.get_pref("host_address")
 func create_level() -> void:
 	network.initialize()
 	network.set_process(true)
+	var level_sub = Node.new()
+	level_sub.name = "level"
+	
+	var player_sub = Node.new()
+	player_sub.name = "players"
+	
+	get_tree().get_root().add_child(level_sub)
+	level_sub.add_child(player_sub)
+	
 	var level = load(map).instance()
-	print_debug(level)
-	get_tree().get_root().add_child(level)
+	level_sub.add_child(level)
+	
+	if !get_tree().is_network_server():
+		network.current_map.add_new_player(1)
+	
 	music.play(preload("res://music/Overworldmaybe.ogg"))
 	hide()
 

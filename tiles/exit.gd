@@ -12,26 +12,24 @@ func body_entered(body) -> void:
 		body.state = "interact"
 		screenfx.play("fadewhite")
 		yield(screenfx, "animation_finished")
-		
+			
 		global.get_player_state()
 		global.next_entrance = entrance
-		
-		print_debug("Used exit")
 		
 		var old_map = get_parent()
 		var root = old_map.get_parent()
 		
 		for peer in network.map_peers:
-			get_tree().rpc_id(peer, "player_exiting_scene")
+			network.rpc_id(peer, "player_exiting_scene", body.name)
 		
 		if get_tree().is_network_server():
 			network.remove_player_from_map(1)
 		else:
-			rpc_id(1, "remove_player_from_map", get_tree().get_network_unique_id())
+			network.rpc_id(1, "remove_player_from_map", body.name)
 		
 		var new_map_path = "res://maps/" + map + ".tmx"
 		var new_map = load(new_map_path).instance()
-		
-		root.remove_child(old_map)
+		network.current_map = new_map
+		get_node("/root/level").call_deferred("add_child", new_map)
+		get_node("/root/level").call_deferred("remove_child", old_map)
 		old_map.call_deferred("queue_free")
-		root.call_deferred("add_child", new_map)
