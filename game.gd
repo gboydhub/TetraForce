@@ -6,11 +6,11 @@ var camera = preload("res://engine/camera.tscn").instance()
 
 func _ready() -> void:
 	network.current_map = self
+	network.set_network_master(get_tree().get_network_unique_id())
 	add_child(camera)
 	add_child(preload("res://ui/hud.tscn").instance())
 	
 	add_new_player(get_tree().get_network_unique_id())
-	network.set_network_master(get_tree().get_network_unique_id())
 		
 	if get_tree().is_network_server():
 		network.add_player_to_map(1, self.name)
@@ -45,16 +45,20 @@ func add_new_player(id: int) -> void:
 		new_player.name = str(id)
 		get_node("/root/level/players").add_child(new_player)
 		new_player.set_network_master(id, true)
-		global.player = new_player
-		global.set_player_state()
-		if !get_tree().is_network_server():
-			network.rpc_id(1, "_receive_my_player_data", get_tree().get_network_unique_id(), network.my_player_data)
+		if id == get_tree().get_network_unique_id():
+			global.player = new_player
+			global.set_player_state()
+			var entity_detect = preload("res://engine/entity_detect.tscn").instance()
+			entity_detect.player = new_player
+			add_child(entity_detect)
+			if !get_tree().is_network_server():
+				network.rpc_id(1, "_receive_my_player_data", get_tree().get_network_unique_id(), network.my_player_data)
 	
 	new_player.enter_map()
 	
-	var entity_detect = preload("res://engine/entity_detect.tscn").instance()
-	entity_detect.player = new_player
-	add_child(entity_detect)
+	if is_network_master() && global.player.is_scene_owner() && id != get_tree().get_network_unique_id():
+		for entity in get_tree().get_nodes_in_group("enemy"):
+			entity.player_entered(id)
 	
 	#new_player.initialize()
 	
@@ -62,15 +66,14 @@ func add_new_player(id: int) -> void:
 		new_player.get_node("Sprite").texture = load(network.my_player_data.skin)
 		new_player.texture_default = load(network.my_player_data.skin)
 		new_player.set_player_label(network.my_player_data.name)
-#	else:
-#		new_player.get_node("Sprite").texture = load(network.player_data.get(id).skin)
-#		new_player.texture_default = load(network.player_data.get(id).skin)
-#		new_player.set_player_label(network.player_data.get(id).name)
+	else:
+		new_player.get_node("Sprite").texture = load(network.player_data.get(id).skin)
+		new_player.texture_default = load(network.player_data.get(id).skin)
+		new_player.set_player_label(network.player_data.get(id).name)
 	
 	emit_signal("player_entered", id)
 
 func remove_player(id: int) -> void:
-	print_debug(str(id))
 	var r_node = get_node("/root/level/players/" + str(id))
 	if r_node:
 		for ed in get_tree().get_nodes_in_group("entity_detect"):
@@ -88,7 +91,6 @@ func update_players() -> void:
 	var player_names: Array = []
 	for player in player_nodes:
 		# first try to remove old players
-		print_debug("PN Check")
 		var id: int = int(player.name)
 		if !map_peers.has(id) && id != get_tree().get_network_unique_id():
 			remove_player(id)

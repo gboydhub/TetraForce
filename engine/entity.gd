@@ -81,7 +81,7 @@ func loop_network() -> void:
 
 	if !network.is_network_master():
 		puppet_update()
-	if position == Vector2(0,0):
+	if position == Vector2(-40,-40) || is_dead():
 		hide()
 	else:
 		show()
@@ -250,11 +250,12 @@ sync func enemy_death() -> void:
 
 remote func set_dead() -> void:
 	hide()
+	home_position = Vector2(-40,-40)
+	position = Vector2(-40,-40)
+	puppet_pos = position
+	health = -1
 	set_physics_process(false)
 	set_process(false)
-	home_position = Vector2(0,0)
-	position = Vector2(0,0)
-	health = -1
 
 func rset_map(property: String, value) -> void:
 	for peer in network.map_peers:
@@ -277,11 +278,11 @@ func sync_property_unreliable(property: String, value) -> void:
 	if TYPE == "PLAYER":
 		if !is_network_master(): 
 			return
-	else: 
+	else:
 		if !is_scene_owner():
 			return
 	rset_unreliable_map(property, value)
 
 func player_entered(id: int) -> void:
-	if is_scene_owner() && is_dead():
+	if is_dead():
 		rpc_id(id, "set_dead")

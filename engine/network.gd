@@ -7,14 +7,14 @@ var current_players: Array = []
 var map_owners: Dictionary = {}
 var map_peers: Array = []
 
-var player_data: Dictionary = {}
-
-var server_object_data = {}
-
 var my_player_data: Dictionary = {
 	skin ="res://player/player.png",
-	name = "", 
+	name = "Unknown", 
 	}
+	
+var player_data: Dictionary = {"default": my_player_data}
+
+var server_object_data = {}
 
 var clock: Timer
 
@@ -46,14 +46,16 @@ remote func _receive_my_player_data(id, new_player_data) -> void:
 	var collision_count: int = 0
 	var player_name: String = new_player_data.name
 	
-	while check_dupe_name(player_name):
-		collision_count += 1
-		player_name = get_player_name(new_player_data.name, collision_count)
+#	while check_dupe_name(player_name):
+#		collision_count += 1
+#		player_name = get_player_name(new_player_data.name, collision_count)
 		
 	new_player_data.name = player_name
 	player_data[id] = new_player_data
 	
 	rpc("_receive_player_data", player_data)
+	_receive_player_data(player_data)
+	print_debug("Got PDAT", player_data)
 	
 func get_player_name(player_name, collision_count) -> String:
 	if collision_count == 0:
@@ -85,9 +87,9 @@ remote func _receive_player_data(received_player_data: Dictionary) -> void:
 	for pid in player_data.keys():
 		var update_p = get_node_or_null("/root/level/players/" + str(pid))
 		if update_p:
-			update_p.get_node("Sprite").texture = load(network.player_data.get(pid).skin)
-			update_p.texture_default = load(network.player_data.get(pid).skin)
-			update_p.set_player_label(network.player_data.get(pid).name)
+			update_p.get_node("Sprite").texture = load(player_data.get(pid).skin)
+			update_p.texture_default = load(player_data.get(pid).skin)
+			update_p.set_player_label(player_data.get(pid).name)
 
 func clock_update() -> void:
 	update_maps()
@@ -107,7 +109,6 @@ remote func add_player_to_map(player_id, map):
 		
 	
 remote func remove_player_from_map(player_id):
-	print_debug("PID", player_id)
 	if active_maps.has(player_id):
 		active_maps.erase(player_id)
 	update_current_players()
@@ -116,6 +117,10 @@ remote func remove_player_from_map(player_id):
 	rpc("_receive_active_maps", active_maps)
 	
 remote func player_exiting_scene(peer_id) -> void:
+	var pnode = get_node_or_null("/root/players/" + str(peer_id))
+	if pnode && is_network_master():
+		pnode.position = Vector2(-4, -20)
+		
 	if map_peers.has(peer_id):
 		map_peers.remove(map_peers.find(peer_id))
 	if active_maps.has(peer_id):
@@ -212,7 +217,6 @@ func _send_flags_to_player(player_id):
 			rpc_id(player_id, "update_object_flag", p_map + "|" + obj, flag, server_object_data[p_map][obj][flag])
 
 master func update_server_object_flag(object_id, flag_name, flag_val):
-	print_debug("SDOF")
 	var split_pos = object_id.find("|")
 	var obj_map = object_id.left(split_pos)
 	var obj_id = object_id.right(split_pos+1)

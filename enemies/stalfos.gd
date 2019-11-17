@@ -10,7 +10,7 @@ func _ready() -> void:
 	movedir = entity_helper.rand_direction()
 
 func _physics_process(delta: float) -> void:
-	if !is_scene_owner() || is_dead():
+	if !is_scene_owner():
 		return
 	
 	loop_movement()
